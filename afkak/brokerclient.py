@@ -12,6 +12,7 @@ import logging
 from collections import OrderedDict
 from functools import partial
 
+from twisted.internet import reactor
 from twisted.internet.error import (ConnectionDone, UserError)
 from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.internet.defer import (
@@ -71,7 +72,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
     def __init__(self, host, port=DefaultKafkaPort,
                  clientId=CLIENT_ID, subscribers=None,
                  maxDelay=MAX_RECONNECT_DELAY_SECONDS, maxRetries=None,
-                 reactor=None):
+                 reactor=reactor):
         """Create a KafkaBrokerClient for a given host/port.
 
         Create a new object to manage the connection to a single Kafka broker.
@@ -92,7 +93,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
             maxRetries: The maximum number of times a reconnect attempt will be
                 made.
             reactor: the twisted reactor to use when making connections or
-                scheduling iDelayedCall calls. Used primarily for testing.
+                scheduling IDelayedCall calls. Used primarily for testing.
         """
         # Set the broker host & port
         self.host = host
@@ -215,7 +216,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
     def buildProtocol(self, addr):
         """Create a KafkaProtocol object, store it in self.proto, return it."""
         # Schedule notification of subscribers
-        self._get_clock().callLater(0, self._notify, True)
+        self.clock.callLater(0, self._notify, True)
         # Build the protocol
         self.proto = ReconnectingClientFactory.buildProtocol(self, addr)
         # point it at us for notifications of arrival of messages
@@ -242,7 +243,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
         # Reset our proto so we don't try to send to a down connection
         self.proto = None
         # Schedule notification of subscribers
-        self._get_clock().callLater(0, self._notify, False, notifyReason)
+        self.clock.callLater(0, self._notify, False, notifyReason)
         # Call our superclass's method to handle reconnecting
         ReconnectingClientFactory.clientConnectionLost(
             self, connector, reason)
@@ -271,7 +272,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
         self.proto = None
 
         # Schedule notification of subscribers
-        self._get_clock().callLater(0, self._notify, False, notifyReason)
+        self.clock.callLater(0, self._notify, False, notifyReason)
         # Call our superclass's method to handle reconnecting
         return ReconnectingClientFactory.clientConnectionFailed(
             self, connector, reason)
@@ -350,13 +351,6 @@ class KafkaBrokerClient(ReconnectingClientFactory):
         self.requests.pop(requestId, None)
         return failure
 
-    def _get_clock(self):
-        """Reactor to use for connecting, callLater, etc [for testing]."""
-        if self.clock is None:
-            from twisted.internet import reactor
-            self.clock = reactor
-        return self.clock
-
     def _connect(self):
         """Initiate a connection to the Kafka Broker."""
         log.debug('%r: _connect', self)
@@ -365,8 +359,7 @@ class KafkaBrokerClient(ReconnectingClientFactory):
             raise ClientError('_connect called but not disconnected')
         # Needed to enable retries after a disconnect
         self.resetDelay()
-        self.connector = self._get_clock().connectTCP(
-            self.host, self.port, self)
+        self.connector = self.clock.connectTCP(self.host, self.port, self)
         log.debug('%r: _connect got connector: %r', self, self.connector)
 
     def _notify(self, connected, reason=None, subs=None):

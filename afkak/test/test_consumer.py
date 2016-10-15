@@ -106,27 +106,15 @@ class TestAfkakConsumer(unittest.TestCase):
 
     def test_consumer_buffer_size_err(self):
         with self.assertRaises(ValueError):
-            consumer = Consumer(None, 'Grues', 99, Mock(),
+            consumer = Consumer(Mock(), 'Grues', 99, Mock(),
                                 buffer_size=8192, max_buffer_size=4096)
             consumer.__repr__()  # pragma: no cover # STFU Pyflakes
 
     def test_consumer_auto_commit_parms_err(self):
         with self.assertRaises(ValueError):
-            consumer = Consumer(None, 'Agnot', 500, Mock(),
+            consumer = Consumer(Mock(), 'Agnot', 500, Mock(),
                                 auto_commit_every_ms=8192)
             consumer.__repr__()  # pragma: no cover # STFU Pyflakes
-
-    def test_consumer_get_clock(self):
-        from twisted.internet import reactor
-        consumer = Consumer(Mock(), 'topic', 23, Mock())
-        clock = consumer._get_clock()
-        self.assertEqual(clock, reactor)
-        self.assertEqual(consumer._clock, reactor)
-        mockClock = Mock()
-        consumer._clock = mockClock
-        clock = consumer._get_clock()
-        self.assertEqual(clock, mockClock)
-        self.assertEqual(consumer._clock, mockClock)
 
     def test_consumer_repr(self):
         mockClient = Mock()

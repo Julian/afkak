@@ -12,6 +12,7 @@ import random
 import collections
 from functools import partial
 from twisted.names import client as DNSclient, dns
+from twisted.internet import reactor
 from twisted.internet.abstract import isIPAddress
 
 from twisted.internet.defer import (
@@ -71,7 +72,7 @@ class KafkaClient(object):
     def __init__(self, hosts, clientId=None,
                  timeout=DEFAULT_REQUEST_TIMEOUT_MSECS,
                  correlation_id=0,
-                 reactor=None):
+                 reactor=reactor):
 
         if timeout is not None:
             timeout /= 1000.0  # msecs to secs
@@ -93,7 +94,6 @@ class KafkaClient(object):
         self._brokers = {}  # Broker-NodeID -> BrokerMetadata
         self._topics = {}  # Topic-Name -> TopicMetadata
         self._closing = False  # Are we shutting down/shutdown?
-        # clock/reactor for testing...
         self.clock = reactor
 
         # Store hosts for lookup later
@@ -513,13 +513,6 @@ class KafkaClient(object):
                 out.append(resp)
         return out
 
-    def _get_clock(self):
-        # Reactor to use for connecting, callLater, etc [test]
-        if self.clock is None:
-            from twisted.internet import reactor
-            self.clock = reactor
-        return self.clock
-
     def _get_brokerclient(self, host, port):
         """
         Get or create a connection to a broker using host and port.
@@ -660,7 +653,7 @@ class KafkaClient(object):
         d = broker.makeRequest(requestId, request, **kwArgs)
         if self.timeout is not None:
             # Set a delayedCall to fire if we don't get a reply in time
-            dc = self._get_clock().callLater(
+            dc = self.clock.callLater(
                 self.timeout, _timeout_request, broker, requestId)
             # Setup a callback on the request deferred to cancel timeout
             d.addBoth(_cancel_timeout, dc)
